@@ -30,5 +30,5 @@ void buffer_destroy(struct buffer_t *buf);
 struct slot_t *buffer_claim(struct buffer_t *buf);
 void buffer_commit(struct buffer_t *buf, const struct slot_t *slot);
 
-int buffer_poll(struct buffer_t *buf, long next);
+long buffer_poll(struct buffer_t *buf, long next);
 const struct slot_t *buffer_read(struct buffer_t *buf, long index);

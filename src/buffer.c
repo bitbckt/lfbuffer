@@ -102,7 +102,7 @@ buffer_commit(struct buffer_t *buf, const struct slot_t *slot)
  * Consumers which have buffer_read() up to index N call this function
  * with N + 1.
  */
-int
+long
 buffer_poll(struct buffer_t *buf, long index)
 {
   /*
