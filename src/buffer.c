@@ -29,6 +29,7 @@ buffer_init(long len)
   buf->seq    = -1;
   buf->read   = -1;
   buf->size   = round2(len);
+  buf->mask   = buf->size - 1;
   buf->data   = calloc(buf->size, sizeof(struct slot_t));
 
   return buf;
@@ -53,9 +54,9 @@ buffer_claim(struct buffer_t *buf)
   for (;;) {
     for (;;) {
       cursor = buf->cursor;
-      index  = buf->read & (buf->size - 1);
+      index  = buf->read & buf->mask;
 
-      if (index != (cursor & (buf->size - 1))) {
+      if (index != (cursor & buf->mask)) {
         break;
       }
     }
@@ -76,7 +77,7 @@ buffer_claim(struct buffer_t *buf)
    * This thread has exclusive ownership of index, therefore writes
    * to buf->data[absolute] need no synchronization.
    */
-  absolute = index & (buf->size - 1);
+  absolute = index & buf->mask;
   buf->data[absolute].index = index;
 
   return &buf->data[absolute];
@@ -125,6 +126,6 @@ buffer_read(struct buffer_t *buf, long index)
    * FIXME: handle multiple consumers.
    */
   buf->read = index;
-  index &= buf->size - 1;
+  index &= buf->mask;
   return &buf->data[index];
 }

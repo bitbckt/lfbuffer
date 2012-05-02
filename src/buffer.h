@@ -21,6 +21,7 @@ struct buffer_t {
   char res3[LINE_PADDING];
 
   long           size;   /* size of the buffer */
+  long           mask;   /* bitmask for cheap % */
   struct slot_t *data;   /* ... data */
 };
 
