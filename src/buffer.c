@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 
 #include "buffer.h"
@@ -24,10 +25,10 @@ buffer_init(long len)
   buf = malloc(sizeof(struct buffer_t));
 
   buf->cursor = 0;
-  buf->seq    = -1;
   buf->read   = -1;
   buf->size   = round2(len);
   buf->mask   = buf->size - 1;
+  buf->state  = calloc(buf->size, sizeof(long));
   buf->data   = calloc(buf->size, sizeof(struct slot_t));
 
   return buf;
@@ -36,6 +37,7 @@ buffer_init(long len)
 void
 buffer_destroy(struct buffer_t *buf)
 {
+  free(buf->state);
   free(buf->data);
   free(buf);
   return;
@@ -71,12 +73,11 @@ buffer_claim(struct buffer_t *buf)
     } /* ... another producer got it. */
   }
 
-  /*
-   * This thread has exclusive ownership of index, therefore writes
-   * to buf->data[absolute] need no synchronization.
-   */
   absolute = index & buf->mask;
   buf->data[absolute].index = index;
+
+  assert(buf->state[absolute] == FREE);
+  buf->state[absolute] = CLAIMED;
 
   return &buf->data[absolute];
 }
@@ -84,46 +85,34 @@ buffer_claim(struct buffer_t *buf)
 void
 buffer_commit(struct buffer_t *buf, const struct slot_t *slot)
 {
-  /*
-   * FIXME: Add thread yield, back off, and dropped events.
-   */
-  while (buf->seq < (slot->index - 1)) { }
+  assert(buf->state[slot->index & buf->mask] == CLAIMED);
 
-  /*
-   * At this point, no other thread may commit a slot at index
-   * greater than slot->index until this store.
-   */
-  buf->seq = slot->index;
+  buf->state[slot->index & buf->mask] = COMMITTED;
   return;
-}
-
-/*
- * Consumers which have buffer_read() up to index N call this function
- * with N + 1.
- */
-long
-buffer_poll(struct buffer_t *buf, long index)
-{
-  /*
-   * FIXME: Add thread yield and/or back off.
-   */
-  while (buf->seq < index) { }
-
-  /*
-   * The lowest committed index is >= index. Consumers may now read from
-   * index to buf->seq.
-   */
-  return buf->seq;
 }
 
 const struct slot_t *
 buffer_read(struct buffer_t *buf, long index)
 {
+  long i  = index & buf->mask;
+  volatile long *s = &buf->state[i];
+
+  while (*s != COMMITTED) { }
+
+  *s = CLAIMED;
+
   /*
    * buf->read should contain the lowest index read by all consumers.
-   * FIXME: handle multiple consumers.
    */
   buf->read = index;
-  index &= buf->mask;
-  return &buf->data[index];
+  return &buf->data[i];
+}
+
+void
+buffer_return(struct buffer_t *buf, const struct slot_t *slot)
+{
+  assert(buf->state[slot->index & buf->mask] == CLAIMED);
+
+  buf->state[slot->index & buf->mask] = FREE;
+  return;
 }

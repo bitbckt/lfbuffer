@@ -22,24 +22,19 @@ consumer(void *b)
 {
   struct buffer_t *buf;
   const struct slot_t *slot;
-  long max, i;
   long curr = 0;
 
   buf = (struct buffer_t *)b;
 
   for (;;) {
-    max = buffer_poll(buf, curr);
-    assert(max >= curr);
+    slot = buffer_read(buf, curr);
+    assert(slot->index == curr);
 
-    for (i = curr; i <= max; i++) {
-      slot = buffer_read(buf, curr);
-      assert(slot->index == curr);
+    buffer_return(buf, slot);
 
-      curr++;
-
-      if (curr == ITERATIONS) {
-        return NULL;
-      }
+    curr++;
+    if (curr == ITERATIONS) {
+      return NULL;
     }
   }
 
