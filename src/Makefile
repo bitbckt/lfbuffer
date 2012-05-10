@@ -1,29 +1,29 @@
 PROG = buffer
 OPTIMIZATION ?= -O2
-CFLAGS ?= -std=c99 -pedantic -pipe $(OPTIMIZATION) -Wall -W -D_THREAD_SAFE
+CFLAGS ?= -pedantic -pipe $(OPTIMIZATION) -Wall -W
 CCLINK ?= -pthread
 DEBUG  ?= -g -rdynamic -ggdb3
 
 CCOPT = $(CFLAGS) $(CCLINK)
 
-OBJ = buffer.o main.o
+OBJ = main.o buffer.o
 
 all: $(PROG)
 
-buffer.o: buffer.c buffer.h
-main.o: main.c buffer.h
+buffer.o: buffer.cpp buffer.hpp
+main.o: main.cpp buffer.hpp
 
 $(PROG): $(OBJ)
-	$(CC) -o $(PROG) $(CCOPT) $(DEBUG) $(OBJ)
+	g++ -o $(PROG) $(CCOPT) $(DEBUG) $(OBJ)
 
-.c.o:
-	$(CC) -c $(CFLAGS) $(DEBUG) $<
+.cpp.o:
+	g++ -c $(CFLAGS) $(DEBUG) $<
 
 noopt:
 	$(MAKE) OPTIMIZATION=""
 
 dep:
-	$(CC) -MM *.c
+	g++ -MM *.cpp
 
 clean:
 	rm -rf $(PROG) *.o

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "buffer.h"
+#include "buffer.hpp"
 
 #define NUM_PRODUCERS 4
 #define BUFFER_SIZE 8*1024
@@ -14,23 +14,22 @@
 struct producer_t {
   int iterations;
   int id;
-  struct buffer_t *buf;
+  Buffer<slot_t>* buf;
 };
 
 void *
 consumer(void *b)
 {
-  struct buffer_t *buf;
-  const struct slot_t *slot;
+  Buffer<slot_t> *buf;
+  const slot_t *slot;
   long curr = 0;
 
-  buf = (struct buffer_t *)b;
+  buf = (Buffer<slot_t> *)b;
 
   for (;;) {
-    slot = buffer_read(buf, curr);
+    slot = buf->get(curr);
     assert(slot->index == curr);
-
-    buffer_return(buf, slot);
+    buf->release(slot);
 
     curr++;
     if (curr == ITERATIONS) {
@@ -46,16 +45,16 @@ consumer(void *b)
 void *
 producer(void *p)
 {
-  struct producer_t *producer;
-  struct slot_t     *slot;
-  long iterations;
+  producer_t* producer;
+  slot_t*     slot;
+  long        iterations;
 
-  producer = (struct producer_t *)p;
+  producer = (producer_t *)p;
 
   for (iterations = producer->iterations; iterations; iterations--) {
-    slot = buffer_claim(producer->buf);
+    slot = producer->buf->claim();
     assert(slot);
-    buffer_commit(producer->buf, slot);
+    producer->buf->commit(slot);
   }
 
   return NULL;
@@ -64,17 +63,15 @@ producer(void *p)
 int
 main(int argc, char *argv[])
 {
-  struct buffer_t  *buf;
-  struct producer_t producers[NUM_PRODUCERS];
+  Buffer<slot_t> buf(BUFFER_SIZE);
+  producer_t producers[NUM_PRODUCERS];
   pthread_t threads[NUM_PRODUCERS + 1];
 
   int i, ret;
 
-  buf = buffer_init(BUFFER_SIZE);
-
   for (i = 0; i < NUM_PRODUCERS; i++) {
     producers[i].iterations = ITERATIONS / NUM_PRODUCERS;
-    producers[i].buf = buf;
+    producers[i].buf = &buf;
     producers[i].id = i;
 
     ret = pthread_create(&threads[i], NULL, producer, &producers[i]);
@@ -84,7 +81,7 @@ main(int argc, char *argv[])
     }
   }
 
-  ret = pthread_create(&threads[NUM_PRODUCERS], NULL, consumer, buf);
+  ret = pthread_create(&threads[NUM_PRODUCERS], NULL, consumer, &buf);
   if (ret != 0) {
     fprintf(stderr, "pthread_create(): %s\n", strerror(ret));
     exit(EXIT_FAILURE);
@@ -98,6 +95,5 @@ main(int argc, char *argv[])
     }
   }
 
-  buffer_destroy(buf);
   return EXIT_SUCCESS;
 }
